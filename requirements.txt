@@ -1,0 +1,4 @@
+numpy
+progress
+pygame==2.1.3
+gymnasium[all]
