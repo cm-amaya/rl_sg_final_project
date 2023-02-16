@@ -16,6 +16,7 @@ parser.add_argument("--episodes", type=int, default=200)
 parser.add_argument("--mode", type=str, required=False, default="Normal")
 parser.add_argument("--runs", type=int, default=1)
 
+
 def run_experiment(
     environment: BaseEnvironment,
     agent: BaseAgent,

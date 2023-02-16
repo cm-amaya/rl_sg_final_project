@@ -5,6 +5,7 @@ from lunar_lander.environments.core import BaseEnvironment
 
 
 class LunarLanderEnvironment(BaseEnvironment):
+    close = None
     def __init__(self, env_info={}):
         self.env = gym.make("LunarLander-v2")
         self.env_info = env_info
@@ -41,3 +42,6 @@ class LunarLanderEnvironment(BaseEnvironment):
     def env_save(self):
         with open(self._map_path, 'wb') as handle:
             pickle.dump(self._env, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def close(self):
+        self.env.close()

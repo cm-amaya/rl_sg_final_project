@@ -4,21 +4,23 @@
 """
 
 from __future__ import print_function
-from gymnasium import wrappers
+from gymnasium.wrappers import RecordVideo
 
 
 class RLGlue:
     """RLGlue class
     args:
-        env_name (string): the name of the module where the Environment class can be found
-        agent_name (string): the name of the module where the Agent class can be found
+        env_name (string): the name of the module where the Environment class
+            can be found
+        agent_name (string): the name of the module where the Agent class
+            can be found
     """
 
     def __init__(self, env_class, agent_class):
         self.env_to_wrap = env_class()
-        self.environment = wrappers.RecordVideo(self.env_to_wrap,
-                                                'videos',
-                                                episode_trigger=lambda x: x % 10 == 0)
+        self.environment = RecordVideo(self.env_to_wrap,
+                                       'videos',
+                                       step_trigger=lambda x: x % 50 == 0)
         self.agent = agent_class()
 
         self.total_reward = None
