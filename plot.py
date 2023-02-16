@@ -3,8 +3,10 @@ import matplotlib.pyplot as plt
 import pickle
 
 plt_legend_dict = {
-    "expected_sarsa_agent_Normal": "Expected SARSA with neural network"}
-path_dict = {"expected_sarsa_agent_Normal": "results/"}
+    "expected_sarsa_agent_Normal": "Expected SARSA with neural network",
+    "expected_sarsa_agent_Alt": "Expected SARSA with new reward"}
+path_dict = {"expected_sarsa_agent_Normal": "results/",
+             "expected_sarsa_agent_Alt": "results/"}
 
 plt_label_dict = {
     "expected_sarsa_agent_Normal": "Sum of\nreward\nduring\nepisode"

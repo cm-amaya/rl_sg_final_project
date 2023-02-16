@@ -32,6 +32,8 @@ def reward_function_alternative(state):
     angle_targ = state[0] * 0.5 + state[2] * 1.0
     if angle_targ > 0.4 or angle_targ < -0.4:
         reward -= 10.0
+    if vel_x > 10 or vel_y > 10:
+        reward -= 5
 
     if abs(state[0]) >= 1.0:
         reward = -100
@@ -68,7 +70,8 @@ class LunarLanderAltEnvironment(BaseEnvironment):
         """
         last_state = self.reward_obs_term[1]
         current_state, reward, is_terminal, truncated, info = self.env.step(action)
-        self.reward_obs_term = (reward, current_state, is_terminal)
+        new_reward = reward_function_alternative(current_state)
+        self.reward_obs_term = (new_reward, current_state, is_terminal)
         return self.reward_obs_term
 
     def env_cleanup(self):
