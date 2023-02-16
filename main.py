@@ -1,100 +1,100 @@
 import os
-import pickle
+import shutil
 import argparse
 import numpy as np
-import gymnasium as gym
 from progress.bar import Bar
-from datetime import datetime
+from lunar_lander.rl_glue import RLGlue
 from lunar_lander.agents.core import BaseAgent
-from lunar_lander.agents.q_learning_agent import QLearningAgent
-from lunar_lander.environment import Enviroment
-
+from lunar_lander.environments.core import BaseEnvironment
+from lunar_lander.agents.action_value_agent import ActionValueAgent
+from lunar_lander.environments.lunar_lander_env import LunarLanderEnvironment
+from lunar_lander.environments.lunar_lander_alt_env import (
+    LunarLanderAltEnvironment
+)
 parser = argparse.ArgumentParser()
-parser.add_argument('--episodes', type=int, default=200)
-parser.add_argument('--agent', type=str, default="QLearning")
-parser.add_argument('--render', type=bool, default=False)
+parser.add_argument("--episodes", type=int, default=200)
+parser.add_argument("--mode", type=str, required=False, default="Normal")
+parser.add_argument("--runs", type=int, default=1)
 
-
-def save_results(agent_type,
-                 q_values,
-                 steps,
-                 n_rewards,
-                 n_state_visits,
-                 n_episodes):
-    result_folder = 'saves/results'
-    if not os.path.exists(result_folder):
-        os.mkdir(result_folder)
-    now = datetime.now().strftime("%m%d%Y_%H%M%S")
-    results_path = os.path.join(result_folder,
-                                f'{agent_type}_{n_episodes}_{now}.pickle')
-    results = {'agent_type': agent_type,
-               'q_values': q_values,
-               'steps': steps,
-               'n_rewards': n_rewards,
-               'n_state_visits': n_state_visits,
-               'episodes': n_episodes}
-    with open(results_path, 'wb') as handle:
-        pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-
-def episode(agent: BaseAgent, env: gym.Env, render: bool = False):
-    observation, info = env.reset()
-    action = agent.agent_start(observation)
-    if render:
-        env.render()
-    terminated = False
-    steps = 0
-    rewards = 0.0
-    state_visits = np.zeros(48)
-    while not terminated:
-        steps += 1
-        observation, reward, terminated, truncated, info = env.step(action)
-        rewards += reward
-        state_visits[observation] += 1
-        if terminated or truncated:
-            agent.agent_end(reward)
-            observation, info = env.reset()
-            break
-        action = agent.agent_step(observation, reward)
-    return steps, rewards, state_visits
+def run_experiment(
+    environment: BaseEnvironment,
+    agent: BaseAgent,
+    agent_parameters,
+    experiment_parameters,
+    mode
+):
+    rl_glue = RLGlue(environment, agent)
+    # save sum of reward at the end of each episode
+    agent_sum_reward = np.zeros(
+        (experiment_parameters["num_runs"],
+         experiment_parameters["num_episodes"])
+    )
+    env_info = {}
+    agent_info = agent_parameters
+    # one agent setting
+    bar = Bar("Processing Run", max=experiment_parameters["num_runs"])
+    for run in range(1, experiment_parameters["num_runs"] + 1):
+        agent_info["seed"] = run
+        agent_info["network_config"]["seed"] = run
+        env_info["seed"] = run
+        rl_glue.rl_init(agent_info, env_info)
+        for episode in range(1, experiment_parameters["num_episodes"] + 1):
+            # run episode
+            rl_glue.rl_episode(experiment_parameters["timeout"])
+            episode_reward = rl_glue.rl_agent_message("get_sum_reward")
+            agent_sum_reward[run - 1, episode - 1] = episode_reward
+        bar.next()
+    bar.finish()
+    save_name = "{}".format(rl_glue.agent.name)
+    if not os.path.exists("results"):
+        os.makedirs("results")
+    np.save("results/sum_reward_{}_{}".format(save_name, mode),
+            agent_sum_reward)
+    shutil.make_archive("results", "zip", "results")
+    rl_glue.rl_cleanup()
 
 
 def main():
     args = parser.parse_args()
-    agent_type = args.agent
+    mode = args.mode
     episodes = args.episodes
-    render = args.render
-    saves_folder = 'saves'
+    runs = args.runs
+    saves_folder = "saves"
     if not os.path.exists(saves_folder):
         os.mkdir(saves_folder)
-    map = Enviroment()
-    if agent_type == "QLearning":
-        agent = QLearningAgent()
-    agent_info = {"num_actions": 4,
-                  "num_states": 16,
-                  "epsilon": 0.1,
-                  "step_size": 0.1,
-                  "discount": 1.0}
-    agent.agent_init(agent_info)
-    n_steps = []
-    n_rewards = []
-    n_state_visits = []
-    bar = Bar('Processing', max=20)
-    for _ in range(episodes):
-        steps, rewards, state_visits = episode(agent, map.env, render)
-        n_steps.append(steps)
-        n_rewards.append(rewards)
-        n_state_visits.append(state_visits)
-        bar.next()
-    bar.finish()
-    agent.agent_save()
-    save_results(agent_type,
-                 agent.q_values,
-                 n_steps,
-                 n_rewards,
-                 n_state_visits,
-                 episodes)
-    map.env.close()
+    if mode == "Normal":
+        current_env = LunarLanderEnvironment
+    else:
+        current_env = LunarLanderAltEnvironment
+    current_agent = ActionValueAgent
+    experiment_parameters = {
+        "num_runs": runs,
+        "num_episodes": episodes,
+        "timeout": 1000,
+    }
+    agent_parameters = {
+        "network_config": {
+            "state_dim": 8,
+            "num_hidden_units": 256,
+            "num_actions": 4
+            },
+        "optimizer_config": {
+            "step_size": 1e-3,
+            "beta_m": 0.9,
+            "beta_v": 0.999,
+            "epsilon": 1e-8,
+            },
+        "replay_buffer_size": 50000,
+        "minibatch_sz": 8,
+        "num_replay_updates_per_step": 4,
+        "gamma": 0.99,
+        "tau": 0.001,
+    }
+    run_experiment(current_env,
+                   current_agent,
+                   agent_parameters,
+                   experiment_parameters,
+                   mode)
 
 
 if __name__ == "__main__":
